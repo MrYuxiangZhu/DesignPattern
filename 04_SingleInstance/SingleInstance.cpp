@@ -1,41 +1,69 @@
-﻿// 单例模式.cpp : 此文件包含 "main" 函数。程序执行将在此处开始并结束。
-//
-
 #include <iostream>
-#include <string.h>
-#include <mutex>
+#include <windows.h>
 
 using namespace std;
 
-class SingleInstance
+HANDLE  g_Mutex = CreateMutex(NULL, FALSE, NULL);
+
+class Singleton
 {
 public:
-	static SingleInstance* get_instance()
+	~Singleton()
 	{
-		if (NULL == instance)
+		std::cout << "~Singleton" << std::endl;
+		if (nullptr != m_pInstance)
 		{
-			m_mutex.lock();
-			instance = new SingleInstance();
-			m_mutex.unlock();
+			delete m_pInstance;
+		}
+	}
+
+	static Singleton* get_instance()
+	{
+		WaitForSingleObject(g_Mutex, INFINITE);
+
+		if (nullptr == m_pInstance)
+		{
+			m_pInstance = new Singleton();
 		}
 
-		return instance;
+		ReleaseMutex(g_Mutex);
+
+		return m_pInstance;
 	}
+
+	void use() { cout << "use singleton" << endl; }
+
 private:
-	SingleInstance() {}
-	SingleInstance(const SingleInstance& a) {};
-	SingleInstance& operator=(const SingleInstance& a) {};
-	static SingleInstance* instance;
-	static std::mutex m_mutex;
+	Singleton()
+	{
+		std::cout << "Singleton" << std::endl;
+	}
+
+	Singleton(Singleton&) = delete;//禁止调用该函数
+	Singleton& operator=(const Singleton&) = delete;//禁止调用该函数
+	static Singleton* m_pInstance;
 };
 
-SingleInstance* SingleInstance::instance = NULL;
-std::mutex SingleInstance::m_mutex;
+Singleton* Singleton::m_pInstance = NULL;
 
-int main()
+DWORD WINAPI ThreadFunction1(LPVOID lpThreadParameter)
 {
-	SingleInstance* s1 = SingleInstance::get_instance();
-	SingleInstance* s2 = SingleInstance::get_instance();
+	Singleton* Instance1 = Singleton::get_instance();
 	return 0;
 }
 
+DWORD WINAPI ThreadFunction2(LPVOID lpThreadParameter)
+{
+	Singleton* Instance2 = Singleton::get_instance();
+	return 0;
+}
+
+int main()
+{
+	HANDLE hThread[2];
+	hThread[0] = CreateThread(NULL, 0, ThreadFunction1, 0, 0, NULL);
+	hThread[1] = CreateThread(NULL, 0, ThreadFunction2, 0, 0, NULL);
+	WaitForMultipleObjects(2, hThread, true, INFINITE);
+
+	return 0;
+}
